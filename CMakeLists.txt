@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(server)
 
-file(GLOB srcs src/*.cpp)
-file(GLOB hdrs include/*.h)
+set(server_src 
+    src/server.cpp
+)
+set(client_src
+    src/client.cpp
+)
 
-add_executable(${CMAKE_PROJECT_NAME} ${srcs} ${hdrs})
+add_executable(server ${server_src})
 
+add_executable(client ${client_src})
