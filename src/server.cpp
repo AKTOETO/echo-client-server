@@ -9,6 +9,9 @@
 
 #define SOCKET_PATH "mysocket" // Путь к сокету
 
+int g_server_fd; // сокет сервера
+std::vector<std::thread> g_threads; // Вектор для хранения потоков
+
 void handleClient(int clientSocket) {
     char buffer[1024];
     int bytesReceived;
@@ -33,25 +36,36 @@ void handleClient(int clientSocket) {
     close(clientSocket);
 }
 
+void exiting()
+{
+    // Закрытие серверного сокета (достигнуто только в случае завершения работы сервера)
+    close(g_server_fd);
+
+    // Дождаться завершения всех потоков
+    for (auto &t : g_threads) {
+        t.detach();
+    }
+    exit(0);
+}
+
 void listenForExit() {
     std::string command;
     while (true) {
         std::getline(std::cin, command);
         if (command == "exit") {
             std::cout << "Сервер завершает работу..." << std::endl;
-            exit(0); // Завершение работы сервера
+            exiting();
         }
     }
 }
 
 int main() {
-    int server_fd, new_socket;
+    int new_socket;
     struct sockaddr_un address;
     int addrlen = sizeof(address);
-    std::vector<std::thread> threads; // Вектор для хранения потоков
 
     // Создание сокета
-    if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+    if ((g_server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
         perror("Ошибка создания сокета");
         exit(EXIT_FAILURE);
     }
@@ -65,13 +79,13 @@ int main() {
     strncpy(address.sun_path, SOCKET_PATH, sizeof(address.sun_path) - 1);
 
     // Привязка сокета к адресу
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+    if (bind(g_server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("Ошибка привязки сокета");
         exit(EXIT_FAILURE);
     }
 
     // Начало прослушивания
-    if (listen(server_fd, 5) < 0) {
+    if (listen(g_server_fd, 5) < 0) {
         perror("Ошибка прослушивания");
         exit(EXIT_FAILURE);
     }
@@ -83,27 +97,18 @@ int main() {
 
     while (true) {
         // Принятие входящего соединения
-        new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen);
+        new_socket = accept(g_server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen);
         if (new_socket < 0) {
             perror("Ошибка принятия соединения");
-            continue;
+            break;
         }
         
         std::cout << "Новый клиент подключен." << std::endl;
 
         // Создание нового потока для обработки клиента
-        threads.emplace_back(handleClient, new_socket);
+        g_threads.emplace_back(handleClient, new_socket);
     }
 
-    // Закрытие серверного сокета (достигнуто только в случае завершения работы сервера)
-    close(server_fd);
-
-    // Дождаться завершения всех потоков
-    for (auto &t : threads) {
-        if (t.joinable()) {
-            t.join();
-        }
-    }
 
     return 0;
 }

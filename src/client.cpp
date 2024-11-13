@@ -40,7 +40,11 @@ int main() {
         }
 
         // Отправка данных на сервер
-        send(sock, message.c_str(), message.size(), 0);
+        if(send(sock, message.c_str(), message.size(), 0) <= 0)
+        {
+            std::cerr << "Ошибка: сервер отключился" << std::endl;
+            break;
+        }
         
         // Ожидание ответа от сервера
         int bytesReceived = recv(sock, buffer, sizeof(buffer) - 1, 0);
